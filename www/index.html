@@ -2407,6 +2407,20 @@ if ('serviceWorker' in navigator && !IS_NATIVE) {
       </div>
     </div>
 
+    <!-- Haptics on beat. Native (Taptic Engine) only, default off. -->
+    <div class="sound-inline-section" id="hapticsSection" style="flex-direction:column;gap:2px">
+      <div style="display:flex;align-items:center;gap:9px">
+        <span class="sound-inline-label">Haptics</span>
+        <label class="sound-toggle sound-toggle-sm">
+          <input type="checkbox" id="hapticsToggle">
+          <span class="sound-slider-track"><span class="sound-slider-thumb"></span></span>
+        </label>
+      </div>
+      <div class="mix-state">
+        <span class="mix-gain">A tap on every beat</span>
+      </div>
+    </div>
+
     <!-- Timing diagnostic. Hidden. Tap the version number to reveal. -->
     <div id="timingHud" style="display:none;padding:6px 10px 8px;background:#0a1420;border-top:1px solid #2a4a6a;font-family:'Courier New',monospace;font-size:9px;line-height:1.5;color:#6ab0d0;letter-spacing:0.3px;">
       <div id="hudLine1">timing: waiting for beats</div>
@@ -3345,6 +3359,39 @@ function spotGlow(beat) {
   }, 80);
 }
 
+// ── Optional haptic-on-beat (Taptic Engine) ──────────────────────────────────
+// Native (Capacitor) only, default OFF. Fired from meterFrame at the exact beat
+// moment (same place the LED flashes), so a tap lands with each click. The
+// downbeat gets a slightly stronger impact than the other beats. On the web
+// build there is no Haptics plugin, so hapticsSupported() is false and this is a
+// no-op — the toggle simply does nothing.
+var HAPTIC_KEY = 'tom_haptics_v1';
+var _hapticsOn = false;
+try { _hapticsOn = (localStorage.getItem(HAPTIC_KEY) === '1'); } catch (e) {}
+
+function hapticsSupported() {
+  return !!(IS_NATIVE && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Haptics);
+}
+function hapticOnBeat(beat) {
+  if (!_hapticsOn || !hapticsSupported()) return;
+  try {
+    window.Capacitor.Plugins.Haptics.impact({ style: (beat === 0 ? 'MEDIUM' : 'LIGHT') });
+  } catch (e) {}
+}
+(function initHapticsToggle() {
+  var cb = document.getElementById('hapticsToggle');
+  if (!cb) return;
+  cb.checked = _hapticsOn;
+  cb.addEventListener('change', function () {
+    _hapticsOn = cb.checked;
+    try { localStorage.setItem(HAPTIC_KEY, _hapticsOn ? '1' : '0'); } catch (e) {}
+    // A single confirming tap when switching it on, so the user feels it work.
+    if (_hapticsOn && hapticsSupported()) {
+      try { window.Capacitor.Plugins.Haptics.impact({ style: 'LIGHT' }); } catch (e) {}
+    }
+  });
+})();
+
 function meterOnBeat(time, beat) {
   _meterPending = { at: time, phase: _meterBeat, period: 60.0 / (currentBpm || 120) };
   _meterBeat    = (_meterBeat + 1) % 2;
@@ -3393,7 +3440,7 @@ function meterFrame() {
 
     while (_beatQ.length && now >= _beatQ[0].at) {
       var bq = _beatQ.shift();
-      flashLed(bq.beat); spotGlow(bq.beat); autoOnBeat(bq.beat);
+      flashLed(bq.beat); spotGlow(bq.beat); autoOnBeat(bq.beat); hapticOnBeat(bq.beat);
     }
     if (_meterSpot && _meterTravel > 0) {
       _meterSpot.style.transform = 'translate3d(' + (u * _meterTravel).toFixed(2) + 'px,0,0)';
