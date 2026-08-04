@@ -2209,8 +2209,18 @@ body {
 // ==========================================================================
 var TOM_VERSION = '2.24';
 
+// ── Native (iOS App Store) detection ──────────────────────────────────────
+// True only when running inside the Capacitor native shell. Everything gated on
+// this keeps the web build (steveball.com) behaving exactly as before while the
+// native app takes the platform-appropriate path: native audio session instead
+// of the MediaStream workaround, no self-update ping, no service worker, and the
+// optional Taptic haptics. The check is defensive so the web build (where
+// window.Capacitor is undefined) simply sees IS_NATIVE === false.
+var IS_NATIVE = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+window.IS_NATIVE = IS_NATIVE;
+
 (function selfUpdate() {
-  if (!window.fetch) return;
+  if (!window.fetch || IS_NATIVE) return;   // app ships its own assets; never self-update from the web
   var url = 'index.html?_=' + Date.now();
   fetch(url, { cache: 'no-store', headers: { 'Range': 'bytes=0-2047' } })
     .then(function(r) { return r.text(); })
@@ -2243,7 +2253,7 @@ var TOM_VERSION = '2.24';
     .catch(function(){});   // offline, carry on with what we have
 })();
 
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && !IS_NATIVE) {
   window.addEventListener('load', function() {
     navigator.serviceWorker.register('/metronome/sw.js').catch(function(){});
   });
@@ -2496,13 +2506,13 @@ if ('serviceWorker' in navigator) {
   <hr class="section-divider">
   <div class="section-desc-wrap">
     <button class="section-desc-toggle" onclick="toggleDesc('quotes-desc')" id="quotes-desc-btn" aria-label="Toggle help text">&#x25BE;</button>
-    <div class="section-desc" id="quotes-desc">Every four minutes a quote appears, then clears itself. Each one is attributed to a named human. Nothing repeats until all 1,803 have been seen. <a href="FAQ.html#quotes" style="color:#6ab0d0;text-decoration:underline">Learn more</a></div>
+    <div class="section-desc" id="quotes-desc">Every four minutes a quote appears, then clears itself. Each one is attributed to a named human. Nothing repeats until all 1,163 have been seen. <a href="FAQ.html#quotes" style="color:#6ab0d0;text-decoration:underline">Learn more</a></div>
   </div>
   <div class="q-row" id="qRow">
     <div class="q-row-main">
       <div class="q-row-text">
         <span class="q-row-label">Practice Quotes</span>
-        <span class="q-count" id="quotesCount">0 / 1,803 seen</span>
+        <span class="q-count" id="quotesCount">0 / 1,163 seen</span>
       </div>
       <label class="sound-toggle sound-toggle-sm q-switch">
         <input type="checkbox" id="quotesToggle" checked>
@@ -2514,7 +2524,7 @@ if ('serviceWorker' in navigator) {
   <hr class="section-divider">
   <div class="section-desc-wrap">
     <button class="section-desc-toggle" onclick="toggleDesc('log-desc')" id="log-desc-btn" aria-label="Toggle help text">&#x25BE;</button>
-    <div class="section-desc" id="log-desc">Sign in with GitHub to log your practice time, track tempos, and sync history across devices. <a href="FAQ.html#log" style="color:#6ab0d0;text-decoration:underline">More in the FAQ</a></div>
+    <div class="section-desc" id="log-desc">Log your practice time and track tempos. Your history is saved on this device. <a href="FAQ.html#log" style="color:#6ab0d0;text-decoration:underline">More in the FAQ</a></div>
   </div>
   <!-- Practice Log toggle -->
   <button class="log-toggle-btn" id="logToggleBtn">&#x1F4CA; Practice Log</button>
@@ -2558,54 +2568,9 @@ if ('serviceWorker' in navigator) {
     </div>
     <hr class="log-divider">
 
-    <!-- Cloud Sync — plain English -->
-    <div class="log-sync-section">
-      <div class="log-sync-header">
-        <span class="log-sync-label">&#x2601; Sync Across Devices</span>
-        <span class="log-sync-status" id="syncStatus"></span>
-      </div>
-      <div class="log-sync-hint" style="margin-bottom:6px">Your practice log stays on this device unless you connect a free GitHub account. No password is shared &mdash; you create a private key that only this app uses. <a href="https://github.com/settings/tokens" target="_blank" style="color:#4a8aaa">Set one up here &rarr;</a></div>
-      <div style="display:flex;gap:6px;align-items:stretch">
-        <!-- Deliberately NOT type="password". A password field is what makes a
-             browser treat this whole group as a login form, which is how your
-             website password ended up in the GitHub key box and your username in
-             the name box. It is masked with CSS instead, so it looks identical
-             and no autofill heuristic ever fires. A script below falls back to a
-             real password field on any browser without CSS masking. -->
-        <input class="log-sync-input masked" id="syncToken" type="text" placeholder="Paste your GitHub key here..."
-             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
-             name="tom-gh-key" data-lpignore="true" data-1p-ignore data-form-type="other" style="flex:1">
-        <!-- A GitHub token cannot be read back from GitHub once it is created, so
-             the only copy you will ever have is the one in this box. Without a way
-             to reveal it there is no way to carry it to a second device. -->
-        <button class="log-action-btn" id="syncTokenShow" type="button" style="flex:0 0 auto;padding:0 10px">Show</button>
-      </div>
-      <!-- The Gist ID is shown and editable on purpose. It used to be hidden and
-           auto-managed, which was fine until it went missing: with no ID the push
-           creates a BRAND NEW Gist rather than updating the old one, so a device
-           silently starts writing to an empty copy while the real history sits
-           untouched in a Gist you can no longer point at. Visible, it can be read
-           off one device and pasted into another, and it makes the split obvious
-           the moment it happens. -->
-      <div class="log-sync-label" style="margin-top:8px">&#x1F517; Gist ID <span style="color:#4a6a7a;font-weight:normal">(from the address bar of your gist)</span></div>
-      <input class="log-sync-input" id="syncGistId" type="text" spellcheck="false"
-             autocomplete="off" autocorrect="off" autocapitalize="off"
-             name="tom-gist-id" data-lpignore="true" data-1p-ignore
-             placeholder="e.g. cce3673e391888c3f36f9a55c40d5f70">
-      <div class="log-sync-buttons" style="margin-top:6px">
-        <button class="log-sync-btn" id="syncPushBtn">&#x2191; Save to cloud</button>
-        <button class="log-sync-btn" id="syncPullBtn">&#x2193; Load from cloud</button>
-      </div>
-      <div class="log-sync-hint" style="margin-top:4px">Use <strong>Save</strong> after a session on this device. Use <strong>Load</strong> when switching to a new device to bring your history here.</div>
-      <div class="log-autosync-row" style="margin-top:6px">
-        <span class="log-autosync-label">Save automatically after every session</span>
-        <div class="log-autosync-toggle" id="autoSyncToggle">
-          <div class="log-autosync-thumb"></div>
-        </div>
-      </div>
-    </div>
+    <!-- Cloud sync (GitHub Gist) removed for the App Store build. Your practice
+         log lives on this device in local storage. -->
 
-    <hr class="log-divider">
 
     <!-- Category Manager -->
     <div class="cat-panel" id="catPanel">
@@ -4203,7 +4168,12 @@ async function ensureAudio() {
   const ctx = getAudioCtx();
   if (!ctx) return;
 
-  if (!isIOS()) {
+  // Native (Capacitor) uses direct output too: AppDelegate configures an
+  // AVAudioSession (.playback) that already routes to the speaker, ignores the
+  // silent switch, and — with the "audio" background mode — survives a screen
+  // lock. The MediaStreamDestination <audio> trick below is a browser-only
+  // workaround for those same problems on iOS Safari, so we skip it natively.
+  if (!isIOS() || IS_NATIVE) {
     // Direct output. Connect once and leave it alone.
     if (!window._directOut) {
       try { masterGain.disconnect(); } catch (e) {}
@@ -4215,7 +4185,7 @@ async function ensureAudio() {
     return;
   }
 
-  // ---- iOS only, from here down ----
+  // ---- iOS Safari (web) only, from here down ----
   if (!window._iosRouterEl && ctx.createMediaStreamDestination) {
     try {
       const msDest = ctx.createMediaStreamDestination();
@@ -4280,7 +4250,7 @@ function audioKickRouter() {
 // that is still playing survives a screen lock, a suspended Web Audio graph
 // does not. Cheap, and it costs nothing when nothing is wrong.
 setInterval(function () {
-  if (isPlaying && isIOS()) audioKickRouter();
+  if (isPlaying && isIOS() && !IS_NATIVE) audioKickRouter();
 }, 1000);
 
 function audioIsDown() {
@@ -5323,7 +5293,8 @@ function syncGetGistId() { return (document.getElementById('syncGistId') || {}).
 // a push carrying materially fewer sessions than that is refused unless it is
 // asked for deliberately. This is the case that matters: local storage is
 // emptied, one session is played, auto-sync fires, and the Gist goes with it.
-async function syncPush(force) {
+async function syncPush(force) { return; }
+async function syncPushDISABLED(force) {
   var token = syncGetToken();
   if (!token) { syncSetStatus('no token entered', true); return; }
 
@@ -5333,7 +5304,7 @@ async function syncPush(force) {
     syncSetStatus('push held: ' + localCount + ' here vs ' + lastCount + ' in cloud', true);
     return;
   }
-  syncSetStatus('pushing...'); 
+  syncSetStatus('pushing...');
   var data    = logLoad();
   var cfg     = syncLoadConfig();
   var gistId  = syncGetGistId() || cfg.gistId || '';
@@ -5391,60 +5362,9 @@ async function syncPush(force) {
   }
 }
 
-async function syncPull() {
-  var token  = syncGetToken();
-  var gistId = syncGetGistId();
-  if (!token)  { syncSetStatus('no GitHub key on this device - paste it above', true); return; }
-  if (!gistId) { syncSetStatus('no Gist ID on this device - paste it above', true); return; }
-  syncSetStatus('pulling...');
-  try {
-    var resp = await fetch('https://api.github.com/gists/' + gistId, {
-      headers: { 'Authorization': 'token ' + token }
-    });
-    if (!resp.ok) {
-      // A bare status number tells you nothing when you are holding a phone.
-      // Name the two things that actually go wrong.
-      if (resp.status === 401) throw new Error('key rejected - paste your GitHub key again');
-      if (resp.status === 404) throw new Error('no gist with that ID for this key');
-      throw new Error('HTTP ' + resp.status);
-    }
-    var result = await resp.json();
-
-    // Read EVERY file in the Gist, not just the live one. Snapshots, older
-    // exports, anything with sessions in it. They are absorbed largest last so
-    // the richest copy has the final word, and the merge is additive throughout,
-    // so pulling can only ever give you more than you had.
-    var names = Object.keys(result.files || {});
-    var docs  = [];
-    for (var i = 0; i < names.length; i++) {
-      var f = result.files[names[i]];
-      if (!f || !f.content || f.truncated) continue;
-      var parsed;
-      try { parsed = JSON.parse(f.content); } catch (e) { continue; }
-      if (!parsed) continue;
-      var arr = Array.isArray(parsed.sessions) ? parsed.sessions
-              : (Array.isArray(parsed) ? parsed : null);
-      if (!arr || !arr.length) continue;
-      docs.push({ name: names[i], doc: parsed, n: arr.length });
-    }
-    if (!docs.length) { syncSetStatus('nothing to load in that Gist', true); return; }
-    docs.sort(function (a, b) { return a.n - b.n; });
-    var total = 0;
-    for (var k = 0; k < docs.length; k++) {
-      total += logAbsorbPayload(docs[k].doc.sessions ? docs[k].doc : { sessions: docs[k].doc });
-    }
-    if (window.console) console.log('[TOM] pulled from ' + docs.length + ' file(s): ' +
-      docs.map(function (d) { return d.name + '(' + d.n + ')'; }).join(', '));
-    calRender();
-    var cfg = syncLoadConfig();
-    cfg.lastPull = new Date().toISOString();
-    cfg.lastCount = (logLoad().sessions || []).length;
-    syncSaveConfig(cfg);
-    syncSetStatus('pulled ' + new Date().toLocaleTimeString());
-  } catch(e) {
-    syncSetStatus('pull failed: ' + e.message, true);
-  }
-}
+// GitHub Gist sync was removed for the App Store build. Practice history lives
+// in localStorage only. Kept as a no-op so any residual caller stays harmless.
+async function syncPull() { return; }
 
 // Sync that does not need remembering.
 //
@@ -5625,25 +5545,13 @@ function authSaveName() {
   var unEl = document.getElementById('logUsername');
   if (unEl) unEl.value = name.trim();
   localStorage.setItem(AUTH_SEEN_KEY, '1');
-  authGoTo(3);
+  // Cloud sync (step 3) was removed for the App Store build, so entering a name
+  // completes onboarding and opens the practice log.
+  authFinish();
 }
 function authSaveToken() {
-  var token = (document.getElementById('authTokenInput') || {}).value || '';
-  if (!token.trim()) { alert('Please paste your GitHub token, or click Skip.'); return; }
-  var cfg = syncLoadConfig();
-  cfg.token = token.trim();
-  syncSaveConfig(cfg);
-  var tokenEl = document.getElementById('syncToken');
-  if (tokenEl) tokenEl.value = token.trim();
-  localStorage.setItem(AUTH_SEEN_KEY, '1');
-  authHide();
-  // Immediately open practice log panel so they see it worked
-  var panel = document.getElementById('logPanel');
-  var btn   = document.getElementById('logToggleBtn');
-  if (panel) { panel.classList.add('visible'); if (btn) btn.classList.add('active'); }
-  logRefreshPanel();
-  // Auto-push first empty log to create their Gist
-  setTimeout(syncPush, 500);
+  // Gist sync removed for the App Store build; nothing to save. Finish cleanly.
+  authFinish();
 }
 function authFinish() {
   localStorage.setItem(AUTH_SEEN_KEY, '1');
@@ -6527,7 +6435,7 @@ function calRender() {
 
   // Motivate (no-token) or nothing (streak shown at top)
   if (!hasToken) {
-    out += '<div class="cal-motivate">Every filled circle above represents a day you practiced. Enable cloud sync to keep this history across all your devices and never lose your streak.</div>';
+    out += '<div class="cal-motivate">Every filled circle above represents a day you practiced. Keep the streak going.</div>';
   }
 
   container.innerHTML = out;
@@ -6998,6 +6906,10 @@ function qParse(line) {
     var bar = attrib.indexOf('|');
     if (bar > -1) { source = attrib.slice(bar + 1).trim(); attrib = attrib.slice(0, bar).trim(); }
   }
+  // In the App Store build the corpus is Steve Ball's own quotes plus Guitar
+  // Craft aphorisms and Steve Turnidge. Show his shorthand "SB" as his full name
+  // so the credit line reads properly and links to his site.
+  if (attrib === 'SB') attrib = 'Steve Ball';
   // A stray period parked outside the closing quote mark.
   text = text.replace(/([\u201D"])\s*\.\s*$/, '$1');
   return { text: text, attrib: attrib, source: source };
@@ -7321,10 +7233,9 @@ calRender();
     <!-- Step 1: Welcome / choose path -->
     <div class="auth-step active" id="authStep1">
       <div class="auth-title">Save Your Progress</div>
-      <div class="auth-subtitle">Track practice sessions, log tempos, and sync across all your devices. Free, and your data stays yours.</div>
+      <div class="auth-subtitle">Track practice sessions and log your tempos. Free, and your data stays on your device.</div>
       <div class="auth-steps-indicator">
         <div class="auth-step-dot active"></div>
-        <div class="auth-step-dot"></div>
         <div class="auth-step-dot"></div>
       </div>
       <button class="auth-btn auth-btn-primary" onclick="authGoTo(2)">Get Started &rarr;</button>
@@ -7332,55 +7243,18 @@ calRender();
       <button class="auth-btn auth-btn-secondary" onclick="authSkip()">Just use the metronome (no tracking)</button>
     </div>
 
-    <!-- Step 2: Enter name -->
+    <!-- Step 2: Enter name (final step — cloud sync removed for the App Store build) -->
     <div class="auth-step" id="authStep2">
       <div class="auth-title">What's your name?</div>
       <div class="auth-subtitle">Used to label your practice log. Stored only on your device.</div>
       <div class="auth-steps-indicator">
         <div class="auth-step-dot"></div>
         <div class="auth-step-dot active"></div>
-        <div class="auth-step-dot"></div>
       </div>
       <input class="auth-input" id="authNameInput" type="text" placeholder="Enter your name to personalize..." maxlength="30"
              autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" name="tom-display-name-2" data-lpignore="true" data-1p-ignore>
-      <button class="auth-btn auth-btn-primary" onclick="authSaveName()">Next &rarr;</button>
+      <button class="auth-btn auth-btn-primary" onclick="authSaveName()">Done &#10003;</button>
       <button class="auth-btn-skip" onclick="authGoTo(1)">&larr; Back</button>
-    </div>
-
-    <!-- Step 3: Cloud sync setup -->
-    <div class="auth-step" id="authStep3">
-      <div class="auth-title">Sync Across Devices</div>
-      <div class="auth-subtitle">Optional. Your data is stored privately in your own free GitHub account &mdash; not on Steve's server.</div>
-      <div class="auth-steps-indicator">
-        <div class="auth-step-dot"></div>
-        <div class="auth-step-dot"></div>
-        <div class="auth-step-dot active"></div>
-      </div>
-      <div class="auth-free-badge">&#10003; Free &nbsp;&middot;&nbsp; Private &nbsp;&middot;&nbsp; Your data, your account</div>
-      <div class="auth-github-steps">
-        <div class="auth-github-step">
-          <div class="auth-github-num">1</div>
-          <div class="auth-github-text">Create a free account at <a href="https://github.com" target="_blank">github.com</a> (skip if you have one)</div>
-        </div>
-        <div class="auth-github-step">
-          <div class="auth-github-num">2</div>
-          <div class="auth-github-text">Go to <a href="https://github.com/settings/tokens" target="_blank">Settings &rarr; Developer Settings &rarr; Tokens (classic)</a></div>
-        </div>
-        <div class="auth-github-step">
-          <div class="auth-github-num">3</div>
-          <div class="auth-github-text">Click <strong>Generate new token</strong>, select only the <strong>gist</strong> checkbox, copy the token</div>
-        </div>
-        <div class="auth-github-step">
-          <div class="auth-github-num">4</div>
-          <div class="auth-github-text">Paste it below. Do this on each device you use.</div>
-        </div>
-      </div>
-      <input class="auth-input masked" id="authTokenInput" type="text" placeholder="Paste your GitHub token here..."
-             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
-             name="tom-gh-key-2" data-lpignore="true" data-1p-ignore data-form-type="other">
-      <button class="auth-btn auth-btn-primary" onclick="authSaveToken()">Save &amp; Finish</button>
-      <div class="auth-or">-- or --</div>
-      <button class="auth-btn auth-btn-secondary" onclick="authFinish()">Skip &mdash; use local storage only</button>
     </div>
 
   </div>
@@ -7411,352 +7285,6 @@ calRender();
      their totals from this block at load, so no other edit is needed.
      ========================================================================== -->
 <script type="text/plain" id="tomQuoteSource">
-"There is no substitute for hard work." - Thomas Edison
-"The main thing is to keep the main thing the main thing." - Stephen Covey
-"You cannot use up creativity." - Maya Angelou
-"The beautiful thing about learning is that nobody can take it away from you." - B.B. King
-"If you hit a wrong note, make it right by what you play afterward." - Joe Pass
-"Simple can be harder than complex." - Steve Jobs
-"Absorb what is useful, discard what is not, add what is uniquely your own." - Bruce Lee
-"There are no shortcuts to any place worth going." - Beverly Sills
-"Confidence is the willingness to try." - Mel Robbins
-"Cynicism is death for the artist." - RF
-"Define the aim simply, clearly, positively." - RF
-"Honour necessity." - RF
-"Live the questions now." - Rainer Maria Rilke
-"You must do the thing you think you cannot do." - Eleanor Roosevelt
-"The path to success is to take massive, determined action." - Tony Robbins
-"We suffer more often in imagination than in reality." - Seneca
-"Start where you are." - Pema Chodron
-"Your past does not equal your future." - Tony Robbins
-"Action is the answer to fear." - Mel Robbins
-"Attention is the rarest and purest form of generosity." - Simone Weil
-"The most effective way to do it is to do it." - Amelia Earhart
-"Energy and persistence conquer all things." - Benjamin Franklin
-"Success is peace of mind." - John Wooden
-"Motivation is garbage." - Mel Robbins
-"Stay hungry, stay foolish." - Steve Jobs
-"Champions keep playing until they get it right." - Billie Jean King
-"The only way out is through." - Robert Frost
-"Setting goals is the first step in turning the invisible into the visible." - Tony Robbins
-"Diligence is the mother of good luck." - Benjamin Franklin
-"Inspiration exists, but it has to find you working." - Pablo Picasso
-"First say to yourself what you would be, then do what you have to do." - Epictetus
-"The quality of the question determines the quality of the answer." - RF
-"Do not count the days; make the days count." - Muhammad Ali
-"Sometimes the impossible is necessary." - RF
-"Waste no more time arguing what a good person should be; be one." - Marcus Aurelius
-"Great things are done by a series of small things brought together." - Vincent van Gogh
-"Make each day your masterpiece." - John Wooden
-"Courage is resistance to fear, mastery of fear, not absence of fear." - Mark Twain
-"Knowing is not enough; we must apply." - Johann Wolfgang von Goethe
-"Follow your bliss." - Joseph Campbell
-"Act as if what you do makes a difference; it does." - William James
-"Use an old idea." - Brian Eno and Peter Schmidt
-"If you cannot, you must; if you must, you can." - Tony Robbins
-"You miss 100 percent of the shots you do not take." - Wayne Gretzky
-"Nothing great was ever achieved without enthusiasm." - Ralph Waldo Emerson
-"A goal without a plan is just a wish." - Antoine de Saint-Exupery
-"Where there is music there is hope." - RF
-"Nature does not hurry, yet everything is accomplished." - Lao Tzu
-"The quieter you become, the more you are able to hear." - Rumi
-"Be here now." - Ram Dass
-"Do not let what you cannot do interfere with what you can do." - John Wooden
-"Repetition is a form of change." - Brian Eno and Peter Schmidt
-"Honor thy error as a hidden intention." - Brian Eno and Peter Schmidt
-"No great thing is created suddenly." - Epictetus
-"A beginning is invisible." - RF
-"Success leaves clues." - Tony Robbins
-"The impediment to action advances action." - Marcus Aurelius
-"Living life as an artist is a practice." - Rick Rubin
-"The real practice of the artist is a way of being in the world." - Rick Rubin
-"No mud, no lotus." - Thich Nhat Hanh
-"Change one small part and the whole is changed." - RF
-"You have to expect things of yourself before you can do them." - Michael Jordan
-"Let the beauty we love be what we do." - Rumi
-"Try again, fail again, fail better." - Samuel Beckett
-"Nothing will work unless you do." - Maya Angelou
-“A beginning is intentional. A start is reactional.” - RF
-“A completion is a new beginning.” - RF
-“A decision changes the world.” - RF
-“A measure of the person: being in tune, in tone, and in time.” - RF
-“A test of our understanding is whether we can apply it in practice.” - RF
-“Abandon concern for hitting the right note. Then, hit the right note.” - RF
-“Accept nothing less than what is right.” - RF
-“Act from principle. Move with intention.” - RF
-“Address the process rather than the outcome. Then, the outcome becomes more likely.” - RF
-“All musicians are one musician.” - RF
-“All that we properly have in life is the quality of our attention.” - RF
-“Although I stumble and fall, each time I will rise again.” - RF
-“An act of quality carries intention, commitment, and presence, and is never accidental.” - RF
-“An exercise is a simulated situation that prepares us for the real thing.” - RF
-“Answers will come through the guitar.” - RF
-“Any creative endeavour has to accept that uncertainty is not only inevitable, but utterly necessary.” - RF
-“Any fool can play something difficult, but to play something simple requires skill.” - RF
-“Any living practice is creative in its nature.” - RF
-“Appreciation is quieter than complaint.” - RF
-“Are we in tune, in tone, and in time?” - RF
-“Attention is the prime tool of any line of craft.” - RF
-“Be present, to the degree you can honourably bear.” - RF
-“Begin with the possible and move gradually towards the impossible.” - RF
-“Better to be present with a bad note than absent from a good note.” - RF
-“Between Silence and sound, is Music.” - RF
-“Commitment to our aim carries us through The Great Divide.” - RF
-“Creative action by one enables creative action in another.” - RF
-“Creative work is serious play.” - RF
-“Define the aim positively, simply, clearly.” - RF
-“Desperate doesn’t mean hopeless. Hopeless doesn’t mean impossible. Impossible doesn’t mean unnecessary.” - RF
-“Discard the superfluous.” - RF
-“Discharge one small task superbly.” - RF
-“Discipline confers reliability, repeatability, and responsibility.” - RF
-“Discipline is a vehicle for joy.” - RF
-“Discipline is doing what we say we’ll do.” - RF
-“Discover joy in the small things.” - RF
-“Do as much as is necessary and as little as possible. But not less than that.” - RF
-“Effective action moves from a Still Point.” - RF
-“Even genius requires a competent technique.” - RF
-“Everything we are is revealed in our playing.” - RF
-“Expect nothing.” - RF
-“Favour the positive.” - RF
-“Gradually extend the parameters of your competence.” - RF
-“Habit plus presence equals skill.” - RF
-“Hearing transforms sound into music.” - RF
-“How we hold our pick is how we live our life.” - RF
-“How we listen to music changes the music.” - RF
-“I am here. I intend.” - RF
-“If we can define our aim, we are halfway to achieving it.” - RF
-“If you wish to discover the degree of habitual functioning, change the tempo.” - RF
-“In the creative act, the Creation continues.” - RF
-“In the small things, we see the large things.” - RF
-“In tuning a note we are tuning ourselves.” - RF
-“Integrity of motion is of greater value than velocity.” - RF
-“Intention determines the orientation. Commitment maintains the direction. Attention holds the course.” - RF
-“Intention trumps technique.” - RF
-“Interrogate the error.” - RF
-“It is necessary to know the next step, but not the step after that.” - RF
-“It is not asked of us that we never fall. It is asked of us that we always get up.” - RF
-“It is not necessary that we succeed. It is necessary that we make the effort.” - RF
-“It’s the recovery that matters.” - RF
-“Joy is a natural response to being alive, and music one way to give it voice.” - RF
-“Let us embrace our mistakes as friends and teachers.” - RF
-“Let us take our work seriously, but not solemnly.” - RF
-“Life is often desperate, but never hopeless.” - RF
-“Listen also with the ears of the heart.” - RF
-“Listening begins from a place of quiet within us. Until then, we only hear what we believe ourselves to be hearing.” - RF
-“Listening changes what we are listening to.” - RF
-“Listening is a craft. Hearing is an art.” - RF
-“Make better mistakes.” - RF
-“Mistakes are at the centre of learning.” - RF
-“Motives push. Aim pulls.” - RF
-“Music creates the musician.” - RF
-“Music is as available to us as we are available to Music.” - RF
-“Music is our friend, if only we might listen. If only we can listen.” - RF
-“Never react: respond.” - RF
-“Nothing worthwhile is achieved suddenly.” - RF
-“Noticing is a creative moment.” - RF
-“One note, struck truly, is a symphony.” - RF
-“One small act of quality is as big as one large act of quality.” - RF
-“Our concern is process, rather than result.” - RF
-“Perfection is impossible. But I may choose to serve perfection.” - RF
-“Persistence is one measure of Wish.” - RF
-“Play is at the heart of creative endeavour.” - RF
-“Practising attention is one way of practising love.” - RF
-“Precision confers definition, clarity, and order.” - RF
-“Relaxation is never accidental.” - RF
-“Remember always to play.” - RF
-“Seek the extraordinary within the ordinary.” - RF
-“Small additional increments are transformative.” - RF
-“The foundation of learning is play.” - RF
-“The key to attainment is persistence.” - RF
-“The Key To It All: the quality of our attention.” - RF
-“The mind prepares the way for the hand to follow.” - RF
-“The more failures, the more successes.” - RF
-“The only contribution we make is the quality of our work.” - RF
-“The primary characteristic of Right Practice is effortlessness.” - RF
-“The simplest is the most difficult to discharge superbly.” - RF
-“There is no mistake, save one: the failure to learn from a mistake.” - RF
-“Trust music.” - RF
-“Trust the process.” - RF
-“Twenty quality minutes a day keeps the world turning. One hour of quality a day changes the world.” - RF
-“We are all at the beginning.” - RF
-“We begin again, again.” - RF
-“We begin where we are. But we begin today.” - RF
-“We do what is possible and allow space for the impossible.” - RF
-“We work with what we have. We work with what we are given.” - RF
-“Welcome the unexpected, but not the arbitrary.” - RF
-“What we get out is in direct proportion to what we put in.” - RF
-“What we hear is the quality of our listening.” - RF
-“When a decision is taken, life becomes simpler.” - RF
-“When spirits are low, engage the body in physical activity.” - RF
-“Where our attention is, is where we are. Where my attention is, is where I Am.” - RF
-“With commitment, all the rules change.” - RF
-“I feel that I am making daily progress.” - Pablo Casals
-“Inspiration is for amateurs. The rest of us just show up and get to work.” - Chuck Close
-“I don't need time. What I need is a deadline.” - Duke Ellington
-“There are two kinds of music. Good music, and the other kind.” - Duke Ellington
-“I merely took the energy it takes to pout and wrote some blues.” - Duke Ellington
-“The more constraints one imposes, the more one frees oneself.” - Igor Stravinsky
-“I was obliged to be industrious. Whoever is equally industrious will succeed equally well.” - Johann Sebastian Bach
-“Inspiration is a guest that does not willingly visit the lazy.” - Pyotr Ilyich Tchaikovsky
-“Amateurs sit and wait for inspiration, the rest of us just get up and go to work.” - Stephen King
-“Practice is a means of inviting the perfection desired.” - Martha Graham
-“Creativity is a habit, and the best creativity is the result of good work habits.” - Twyla Tharp
-“Without deviation from the norm, progress is not possible.” - Frank Zappa
-“Start where you are. Use what you have. Do what you can.” - Arthur Ashe
-“Failing to prepare is preparing to fail.” - John Wooden
-“It's the little details that are vital. Little things make big things happen.” - John Wooden
-“Never mistake activity for achievement.” - John Wooden
-“Be quick, but don't hurry.” - John Wooden
-“You do not rise to the level of your goals. You fall to the level of your systems.” - James Clear
-“Every action you take is a vote for the type of person you wish to become.” - James Clear
-“Enthusiasm is common. Endurance is rare.” - Angela Duckworth
-“Becoming is better than being.” - Carol Dweck
-“If people knew how hard I worked to gain my mastery, it would not seem so wonderful at all.” - Michelangelo
-“I am always doing that which I cannot do, in order that I may learn how to do it.” - Pablo Picasso
-“Every child is an artist. The problem is how to remain an artist once we grow up.” - Pablo Picasso
-“Great things are not done by impulse, but by a series of small things brought together.” - Vincent van Gogh
-“I have already settled it for myself so flattery and criticism go down the same drain.” - Georgia O'Keeffe
-“Whether you succeed or not is irrelevant. Making your unknown known is the important thing.” - Georgia O'Keeffe
-“Nothing is less real than realism. Details are confusing.” - Georgia O'Keeffe
-“The way to get started is to quit talking and begin doing.” - Walt Disney
-“I have not failed. I've just found ten thousand ways that won't work.” - Thomas Edison
-“Our greatest weakness lies in giving up.” - Thomas Edison
-“Genius is one percent inspiration and ninety-nine percent perspiration.” - Thomas Edison
-“It's not the daily increase but daily decrease. Hack away at the unessential.” - Bruce Lee
-“I fear not the man who has practiced ten thousand kicks once.” - Bruce Lee
-“Do not pray for an easy life, pray for the strength to endure a difficult one.” - Bruce Lee
-“Adapt what is useful, reject what is useless, and add what is specifically your own.” - Bruce Lee
-“Discipline is the bridge between goals and accomplishment.” - Jim Rohn
-“Success is neither magical nor mysterious. It is the natural consequence of applying fundamentals.” - Jim Rohn
-“Motivation is what gets you started. Habit is what keeps you going.” - Jim Rohn
-“I've missed more than nine thousand shots in my career.” - Michael Jordan
-“I can accept failure, everyone fails at something. But I can't accept not trying.” - Michael Jordan
-“Some people want it to happen, some wish it would happen, others make it happen.” - Michael Jordan
-“Everybody has talent, but ability takes hard work.” - Michael Jordan
-“Pressure is a privilege.” - Billie Jean King
-“I hated every minute of training, but I said, don't quit. Suffer now and live as a champion.” - Muhammad Ali
-“The fight is won or lost far away from witnesses, behind the lines, in the gym.” - Muhammad Ali
-“Everything negative, pressure, challenges, is all an opportunity for me to rise.” - Kobe Bryant
-“The most important thing is to try and inspire people so they can be great at whatever they want to do.” - Kobe Bryant
-“Talent you have naturally. Skill is only developed by hours and hours of work.” - Will Smith
-“You miss one hundred percent of the shots you never take.” - Wayne Gretzky
-“The difference between a successful person and others is a will of unbending intent.” - Vince Lombardi
-“Winning is a habit. Unfortunately, so is losing.” - Vince Lombardi
-“Fatigue makes cowards of us all.” - Vince Lombardi
-“Excellence is the gradual result of always striving to do better.” - Pat Riley
-“Nothing in the world can take the place of persistence.” - Calvin Coolidge
-“By failing to prepare, you are preparing to fail.” - Benjamin Franklin
-“Well done is better than well said.” - Benjamin Franklin
-“The man who moves a mountain begins by carrying away small stones.” - Confucius
-“I hear and I forget. I see and I remember. I do and I understand.” - Confucius
-“Wheresoever you go, go with all your heart.” - Confucius
-“He who conquers himself is the mightiest warrior.” - Confucius
-“A journey of a thousand miles begins with a single step.” - Lao Tzu
-“Mastering others is strength. Mastering yourself is true power.” - Lao Tzu
-“No man is free who is not master of himself.” - Epictetus
-“If you want to improve, be content to be thought foolish and stupid.” - Epictetus
-“It is not the man who has too little, but the man who craves more, that is poor.” - Seneca
-“While we wait for life, life passes.” - Seneca
-“Difficulties strengthen the mind, as labour does the body.” - Seneca
-“You have power over your mind, not outside events. Realize this, and you will find strength.” - Marcus Aurelius
-“Waste no more time arguing about what a good man should be. Be one.” - Marcus Aurelius
-“The impediment to action advances action. What stands in the way becomes the way.” - Marcus Aurelius
-“Confine yourself to the present.” - Marcus Aurelius
-“Never let the future disturb you. You will meet it with the same weapons of reason.” - Marcus Aurelius
-“In the realm of ideas everything depends on enthusiasm. In the real world all rests on perseverance.” - Johann Wolfgang von Goethe
-“What is not started today is never finished tomorrow.” - Johann Wolfgang von Goethe
-“Do not go where the path may lead, go instead where there is no path.” - Ralph Waldo Emerson
-“What lies behind us and what lies before us are tiny matters.” - Ralph Waldo Emerson
-“The only person you are destined to become is the person you decide to be.” - Ralph Waldo Emerson
-“If you want to build a ship, do not drum up people to gather wood.” - Antoine de Saint-Exupery
-“Ever tried. Ever failed. No matter. Try again. Fail again. Fail better.” - Samuel Beckett
-“The future depends on what you do today.” - Mahatma Gandhi
-“Satisfaction lies in the effort, not in the attainment. Full effort is full victory.” - Mahatma Gandhi
-“Live as if you were to die tomorrow. Learn as if you were to live forever.” - Mahatma Gandhi
-“It always seems impossible until it's done.” - Nelson Mandela
-“Do not judge me by my successes, judge me by how many times I fell down and got back up.” - Nelson Mandela
-“You may encounter many defeats, but you must not be defeated.” - Maya Angelou
-“Do the best you can until you know better. Then when you know better, do better.” - Maya Angelou
-“The future belongs to those who believe in the beauty of their dreams.” - Eleanor Roosevelt
-“Do one thing every day that scares you.” - Eleanor Roosevelt
-“It is better to light a candle than curse the darkness.” - Eleanor Roosevelt
-“Courage is not the absence of fear but the triumph over it.” - Nelson Mandela
-“Coming together is a beginning, staying together is progress, working together is success.” - Henry Ford
-“Obstacles are those frightful things you see when you take your eyes off your goal.” - Henry Ford
-“Quality means doing it right when no one is looking.” - Henry Ford
-“The best way to get something done is to begin.” - Amelia Earhart
-“The most difficult thing is the decision to act, the rest is merely tenacity.” - Amelia Earhart
-“Your work is going to fill a large part of your life. The only way to do great work is to love what you do.” - Steve Jobs
-“Innovation distinguishes between a leader and a follower.” - Steve Jobs
-“Real artists ship.” - Steve Jobs
-“I'm convinced that about half of what separates successful entrepreneurs is pure perseverance.” - Steve Jobs
-“Focusing is about saying no.” - Steve Jobs
-“Perseverance is not a long race. It is many short races one after the other.” - Walter Elliot
-“Success is the sum of small efforts repeated day in and day out.” - Robert Collier
-“Great works are performed not by strength but by perseverance.” - Samuel Johnson
-“What we hope ever to do with ease, we must first learn to do with diligence.” - Samuel Johnson
-“Patience and perseverance have a magical effect.” - John Quincy Adams
-“Permanence, perseverance and persistence in spite of all obstacles.” - Thomas Carlyle
-“Perfection is achieved not when there is nothing more to add, but when there is nothing left to take away.” - Antoine de Saint-Exupery
-“We are what we repeatedly do. Excellence, then, is not an act but a habit.” - Will Durant
-“Having unlimited choices can paralyze you creatively.” - David Byrne
-“One of the benefits of playing small clubs for a few years is that you're allowed to fail.” - David Byrne
-“We don't make music. It makes us.” - David Byrne
-“Being creative is a job.” - David Byrne
-“The world isn't logical, it's a song.” - David Byrne
-“The more you know, the more you know you don't know.” - David Byrne
-“What begins as a random walk often ends up taking you exactly where you wanted to go.” - David Byrne
-“Simplicity is a kind of transparency in which subtle nuances can have outsize effects.” - David Byrne
-“I'll throw myself into an area I don't understand, so I'm forced to swim to stay afloat.” - David Byrne
-“Their demons are also what make them create.” - David Byrne
-“The better a singer's voice, the harder it is to believe what they're saying.” - David Byrne
-“Making music has a more beneficial effect on us than simply consuming it.” - David Byrne
-“The way you do anything is the way you do everything.” - Tom Waits
-“You don't go to songwriting school. You learn by listening to tunes.” - Tom Waits
-“Take them apart, see what they're made of, and wonder if you can make one too.” - Tom Waits
-“I like beautiful melodies telling me terrible things.” - Tom Waits
-“What I'm trying to do is get what comes through, and keep it alive.” - Tom Waits
-“It's like carrying water in your hands.” - Tom Waits
-“The best practice you can get is on the bandstand, but between gigs I have to stay in shape.” - Bill Bruford
-“If I was hearing something I couldn't do, I would figure out how to do it.” - Bill Bruford
-“I have the classic amateur's technique. I know some very tricky bits and I have large gaping holes.” - Bill Bruford
-“One of the great things about good players in your band is that you just ask them questions.” - Bill Bruford
-“I practice at home, in between phone calls, and have much to do.” - Bill Bruford
-“You learn so much about music from all the people you surround yourself with.” - Bill Bruford
-“Leave your expectations in the lobby.” - Bill Bruford
-“Entertainment tells everybody everything is alright. Music is on the side of the upsetters.” - Bill Bruford
-“Holding on to some of your uniqueness is the trick.” - Bill Bruford
-“A rock band used to be four guys and a drummer. Now it's five guys reading manuals.” - Bill Bruford
-“I was always an artist first, and Whip It was an accident.” - Mark Mothersbaugh
-“When the engineer was mixing I'd go into the other room and make new prints.” - Mark Mothersbaugh
-“I think of it as a gift, even though it is a handicap.” - Mark Mothersbaugh
-“I make books, but I only make them one at a time.” - Mark Mothersbaugh
-“Showing people who I am, instead of who people think I am.” - Mark Mothersbaugh
-“If you're going to be a musician, expand your horizons, compose things, work with other instruments.” - Stewart Copeland
-“Making music has gotten easier. Selling it has gotten harder.” - Stewart Copeland
-“For me, it's a celebration: let's light up this room and let's have fun.” - Stewart Copeland
-“We really achieved everything we needed to achieve.” - Stewart Copeland
-“I am interested in perceptible processes.” - Steve Reich
-“I want to be able to hear the process happening throughout the sounding music.” - Steve Reich
-“I have tried to expand and develop my musical vocabulary.” - Steve Reich
-“Theory must follow practice. Theory is not a set of directions for composing music.” - Walter Piston
-“Miles took a breath. And then he played this phrase that made my chord right.” - Herbie Hancock
-“It was so wrong. In an instant, time stood still and I felt totally shattered.” - Herbie Hancock
-“We were communicating almost telepathically.” - Herbie Hancock
-“It didn't matter whether I composed a note of music or not.” - Philip Glass
-“The strategy was to tame my muse, encouraging it to be active at the times I had set.” - Philip Glass
-“If you don't know what to do, there's actually a chance of doing something new.” - Philip Glass
-“I realized right away that I needed to quickly develop impeccable work habits.” - Philip Glass
-“My first goal was to be able to sit at a piano or desk for three hours.” - Philip Glass
-“I was painfully aware of how defective my basic skills were.” - Philip Glass
-“I had a very poor grasp of real technique.” - Philip Glass
-“A lot of Einstein on the Beach was written at night after driving a cab.” - Philip Glass
-“While I'm here, I'll do the work. And what's the work? To ease the pain of living.” - Allen Ginsberg
-“I would say I practice quite a bit.” - Tony Levin
-“I had to do some practicing to hit the string that I aimed at.” - Tony Levin
-“Some people just pick it up easily and some people are just utterly puzzled by it.” - Tony Levin
-“It's not the easiest way to play in the world, but it's not extremely difficult.” - Tony Levin
-“The hardest thing was to dampen the other strings to keep them from ringing.” - Tony Levin
 “No algorithm. No VCs or corporate backing. Just a view from inside the work of Being Musical.” - SB
 “A door is open. The question is: will you walk through it?” - SB
 “What begins at the top of the knot looks different depending on where you are standing.” - SB
@@ -8203,158 +7731,7 @@ calRender();
 “More like a spontaneous music diary than a deeply considered, perfectly polished masterpiece.” - SB
 “Containers for improvisation.” - SB
 “Going against the grain of establishment.” - SB
-“My experience is that if I don't stop working, the situation improves.” - Rob Fetters | Innerviews
-“I practice life.” - Rob Fetters | Innerviews
-“Stepping back from the guitar endears me to it.” - Michael Hedges | Innerviews
-“It's enriching my soul and the soul can flow into the guitar.” - Michael Hedges | Innerviews
-“Clarity.” - Bill Bruford | Innerviews
-“Broadly speaking, the slower the tempo, the better.” - Bill Bruford | Innerviews
-“Writing a song is like organizing an accident.” - Björk | Innerviews
-“We all have songs inside us.” - Björk | Innerviews
-“I love to be useful.” - Sheila Chandra | Innerviews
-“Really edgy work takes a lot of boring hours.” - Sheila Chandra | Innerviews
-“It forces me to play musically and pay attention to my surroundings.” - Kai Eckhardt | Innerviews
-“I consciously chose to sacrifice variety of tone to put the burden on my articulation.” - Kai Eckhardt | Innerviews
-“Every day, the music evolves.” - Hiromi | Innerviews
-“I try to compose every single day.” - Hiromi | Innerviews
-“We just sat down and played and did whatever was necessary to make it work musically and be fun.” - Zakir Hussain | Innerviews
-“I bend the rules, but I know what the rules are before bending them.” - John McLaughlin | Innerviews
-“If you can sing it, you know it, and you can play it.” - John McLaughlin | Innerviews
-“Get out of a rut, musically, by forcing yourself into different limitations.” - Steve Morse | Innerviews
-“I still practice every day and always have.” - Steve Morse | Innerviews
-“Hopefully you can keep chipping away at it and it gets used later.” - Tony Levin | Innerviews
-“Music is more of a living thing to guys like me that are playing every day.” - Tony Levin | Innerviews
-“You can always take another solo.” - Vernon Reid | Innerviews
-“I try to speak through my instrument and see what conversations I can create.” - Vernon Reid | Innerviews
-“How do you know when a song you've written is complete?” - Anil Prasad | Innerviews
-“What's at the center of your creative spirit?” - Anil Prasad | Innerviews
-“Art is mental and social food.” - Nik Bärtsch | Innerviews
-“Our Monday concerts have given us an anchor in these times.” - Nik Bärtsch | Innerviews
-“It was a test of my capacity to let go of the music.” - Nik Bärtsch | Innerviews
-“A finished piece can still be deconstructed to create a new view.” - Nik Bärtsch | Innerviews
-“You have to transcend your knowledge in a way that surprises even yourself.” - Nik Bärtsch | Innerviews
-“You need to be on the edge of your capacity to be creative.” - Nik Bärtsch | Innerviews
-“It can also mean playing nothing.” - Nik Bärtsch | Innerviews
-“Playing together is the highest expression of music.” - Nik Bärtsch | Innerviews
-“Sometimes I just feed my thoughts straight into the songs.” - Adrian Belew | Innerviews
-“What do I really want to say?” - Adrian Belew | Innerviews
-“I'm just continually making this flowing, ever-changing sound.” - Adrian Belew | Innerviews
-“We did it purely as an art form.” - Adrian Belew | Innerviews
-“Composition is a marathon, not a sprint.” - Pierre Bensusan | Innerviews
-“It became very easy for me to move from one musical point to another.” - Eraldo Bernocchi | Innerviews
-“I created Sigillum S to have total freedom.” - Eraldo Bernocchi | Innerviews
-“The music had already evolved in a live context.” - George Brooks | Innerviews
-“Things were more relaxed in the studio.” - George Brooks | Innerviews
-“We got to know each other.” - George Brooks | Innerviews
-“The personalities really blended.” - George Brooks | Innerviews
-“I want to keep that component and balance it with the mental side.” - Steve Coleman | Innerviews
-“I learned a long time ago not to worry about what I don't have control over.” - Steve Coleman | Innerviews
-“My job as a musician is to study musicians who've done that.” - Steve Coleman | Innerviews
-“The point is to study.” - Steve Coleman | Innerviews
-“You develop a certain amount of patience as you get older.” - Steve Coleman | Innerviews
-“Your choices are influenced by that.” - Sussan Deyhim | Innerviews
-“I decided to let it all breathe.” - Sussan Deyhim | Innerviews
-“I chose to release both versions to showcase the different takes.” - Sussan Deyhim | Innerviews
-“I narrowed the music down to those two elements.” - Colin Edwin | Innerviews
-“It sounds like we're all in the same room together.” - Colin Edwin | Innerviews
-“It feels like a true representation of how I felt the band should sound.” - Colin Edwin | Innerviews
-“They gave us total artistic freedom.” - Colin Edwin | Innerviews
-“There is a lot of music that uses notes between the cracks.” - David Fiuczynski | Innerviews
-“The best way to talk about microtones is by looking at the blues.” - David Fiuczynski | Innerviews
-“Blues players will milk the area between the minor third and the major third.” - David Fiuczynski | Innerviews
-“I've started recording everything I do when I pick up my banjo.” - Béla Fleck | Innerviews
-“Ideas can also happen anywhere.” - Béla Fleck | Innerviews
-“If I sing them first, they can sound more melodic.” - Béla Fleck | Innerviews
-“I have to keep pushing until I come up with something really special.” - Béla Fleck | Innerviews
-“I tend to hone in on sections and keep playing them.” - Béla Fleck | Innerviews
-“It represents the biggest adventure of my life.” - Béla Fleck | Innerviews
-“I like to experiment, discover new sounds, timbres, and combinations.” - Tania Giannouli | Innerviews
-“I don't think at all in terms of having to play in a jazzy way.” - Tania Giannouli | Innerviews
-“He makes a universal sound that provides endless possibilities.” - Tania Giannouli | Innerviews
-“I was practicing the cello suites and capturing them on a reel-to-reel tape recorder.” - Derek Gripper | Innerviews
-“It was great to get back to working with a device that didn't send me emails.” - Derek Gripper | Innerviews
-“I found the process much more grounding.” - Derek Gripper | Innerviews
-“Every project I've done has felt necessary in some way.” - Vijay Iyer | Innerviews
-“That can lead to discoveries on everyone's part about what is possible.” - Vijay Iyer | Innerviews
-“I have to think about how to make music in new kinds of ways.” - Vijay Iyer | Innerviews
-“We can communicate progress without being too precious about personal choices.” - Steve Jansen | Innerviews
-“We have the confidence in one another to listen.” - Steve Jansen | Innerviews
-“Never rest on your laurels or believe your own way is the best way.” - Steve Jansen | Innerviews
-“I've always been interested in beats and rhythm.” - Joan Jeanrenaud | Innerviews
-“The cellist was also serving as the bassist and drummer.” - Joan Jeanrenaud | Innerviews
-“They are the foundation of every group.” - Joan Jeanrenaud | Innerviews
-“I could probably make an album like that a week and every one would be different.” - Henry Kaiser | Innerviews
-“I found this particular niche with the guitar.” - Henry Kaiser | Innerviews
-“I wasn't even thinking about what I was doing.” - Henry Kaiser | Innerviews
-“It starts from one simple phrase and builds in complexity from there.” - Zoë Keating | Innerviews
-“I'll do a lot of improvising to move things along.” - Zoë Keating | Innerviews
-“I'll keep going until it feels complete.” - Zoë Keating | Innerviews
-“I tend to do better working on deadlines.” - Zoë Keating | Innerviews
-“I always try to have at least one new piece together.” - Zoë Keating | Innerviews
-“Driving to go work there is an important part of the process for me.” - Mike Keneally | Innerviews
-“I'm proudly non-gear oriented.” - Mike Keneally | Innerviews
-“I might finally see how to resolve it by playing it live.” - Leo Kottke | Innerviews
-“I play in front of people with an empty head.” - Leo Kottke | Innerviews
-“We started to see the shape of it.” - Leo Kottke | Innerviews
-“I could do this from anywhere.” - Pete Levin | Innerviews
-“I use African polyrhythms with my right hand.” - Lionel Loueke | Innerviews
-“I use my nails and my ring against various parts of the body.” - Lionel Loueke | Innerviews
-“The other way I perform percussion on the guitar is by using harmonics.” - Lionel Loueke | Innerviews
-“It's always been a goal of mine to keep a lot of variety in my sound.” - Michael Manring | Innerviews
-“Each piece on the album has its own little sonic world.” - Michael Manring | Innerviews
-“I also play the basses in lots of different ways.” - Michael Manring | Innerviews
-“I recorded all of the pieces live without overdubs or fixes.” - Michael Manring | Innerviews
-“We spent a lot of rehearsal time on it.” - Pat Mastelotto | Innerviews
-“It continues to be fine-tuned as we play it on tour.” - Pat Mastelotto | Innerviews
-“The repertoire is always growing.” - Pat Mastelotto | Innerviews
-“We would experiment with different things.” - Marilyn Mazur | Innerviews
-“I always missed the gathering of energy that we had in that group.” - Marilyn Mazur | Innerviews
-“I want to make a group so we can regularly meet.” - Marilyn Mazur | Innerviews
-“It made me focus on the pieces.” - Pat Metheny | Innerviews
-“My only choice was to play this guitar.” - Pat Metheny | Innerviews
-“They just instantly hooked up.” - Pat Metheny | Innerviews
-“It seemed like we had played together all our lives.” - Pat Metheny | Innerviews
-“I usually record without thinking about how an album will take shape.” - Bill Nelson | Innerviews
-“I go back and work through the material.” - Bill Nelson | Innerviews
-“I try to sort the material into some semblance of a theme.” - Bill Nelson | Innerviews
-“Sounds cannot be added forever.” - Jean-Luc Ponty | Innerviews
-“I quickly realized there was a limit.” - Jean-Luc Ponty | Innerviews
-“The harmonies start melting into each other.” - Jean-Luc Ponty | Innerviews
-“I'm still delighted to be in the moment of doing it.” - Peter Hammill | Innerviews
-“It's still exciting when something has really worked out.” - Peter Hammill | Innerviews
-“Finding words that work with a tune is still exciting.” - Peter Hammill | Innerviews
-“We all wanted to capture where Gong is here and now.” - Steve Hillage | Innerviews
-“That was then. This is now.” - Steve Hillage | Innerviews
-“Making a record that sounded like the seventies would be creatively bankrupt.” - Steve Hillage | Innerviews
-“I have my own system that I use.” - Allan Holdsworth | Innerviews
-“With the guitar, you have a lot of choices where you can play a note.” - Allan Holdsworth | Innerviews
 “What is the question you are asking?” - SB
-“How do we make new work?” - Tim Root
-“Eventually I had to sit down and do the work.” - Tim Root
-“It certainly is easier to write things that surprise me away from the instrument.” - Tim Root
-“Practice away from the instrument: it's easier to not fall into my habits.” - Tim Root
-“It showed up because I happened to be paying attention.” - Tim Root
-“I latched onto it and memorized it and refined it.” - Tim Root
-“All good work has as its basis crushing self-doubt.” - Tim Root
-“We must trust the process. Or not.” - David Singleton (The Vicar)
-“This is a creative process.” - David Singleton (The Vicar)
-“The outcome is therefore necessarily uncertain.” - David Singleton (The Vicar)
-“There are times when the creative impulse takes us into its confidence and beckons us forward.” - David Singleton (The Vicar)
-“Impatience is a virtue.” - David Singleton (The Vicar)
-“The music business is unfortunately more concerned with business than it is with music.” - David Singleton (The Vicar)
-“So pay me in music.” - David Singleton (The Vicar)
-“The outcome is wonderfully insecure and totally hazardous.” - David Singleton (The Vicar)
-“If for one night only you could play anything, what would it be?” - David Singleton (The Vicar)
-“Act with intention and all will be well.” - David Singleton (The Vicar)
-“A pause perhaps, before we start.” - David Singleton (The Vicar)
-“Think before you speak.” - David Singleton (The Vicar)
-“You should learn to trust in the good fairy.” - David Singleton (The Vicar)
-“If you become too cynical, when she comes knocking, you might just slam the door in her face.” - David Singleton (The Vicar)
-“You will achieve nothing until you lower your levels of stress.” - David Singleton (The Vicar)
-“The quick answer is yes.” - David Singleton (The Vicar)
-“This business of music would be so much easier if it did not involve musicians.” - David Singleton (The Vicar)
-“At my normal rates, you certainly could not afford me.” - David Singleton (The Vicar)
-“It is amazing the amount of goodwill that is available to us.” - David Singleton (The Vicar)
 “Mastering your music is like mastering your life.” - Steve Turnidge
 “The most important decision you have to make is your next one.” - Steve Turnidge
 “Everything happens at exactly the right time to get to where we are now.” - Steve Turnidge
@@ -8501,56 +7878,6 @@ calRender();
 “Even hardened criminals can't stand being around this guy.” - SB
 “Or perhaps it has something to do with the cheapo burritos we ate before rehearsal?” - SB
 “Feeling small and humble this evening.” - SB
-“For some of us, impossibility is an invitation.” - Anthony Garone
-“Impossible means it must be tried.” - Anthony Garone
-“What would it take to do it?” - Anthony Garone
-“What is in your life that you believe to be impossible?” - Anthony Garone
-“I like pursuing the impossible because I get a chance to explore the unknown.” - Anthony Garone
-“With that mindset, every step is new territory.” - Anthony Garone
-“Every mistake is a learning opportunity.” - Anthony Garone
-“Whether I achieve the impossible is secondary to the value of learning and growing.” - Anthony Garone
-“I think I can do this.” - Anthony Garone
-“Maybe I'm getting good enough.” - Anthony Garone
-“It might be possible to play this.” - Anthony Garone
-“Every month of practice led to a new breakthrough.” - Anthony Garone
-“All I had was a borrowed guitar, a CD player, my ears, and determination.” - Anthony Garone
-“I started learning it one second at a time.” - Anthony Garone
-“Learning music by ear and playing along with CDs became a way of life for me.” - Anthony Garone
-“It requires a special type of preparation.” - Anthony Garone
-“If I can't visualize in my brain the act of playing Fracture, then going to the guitar isn't going to be a worthwhile experience.” - Anthony Garone
-“I'm convinced that mental practice is at least as effective as picking up the guitar.” - Anthony Garone
-“This mental practice is detailed and nothing is glossed over.” - Anthony Garone
-“When I feel prepared mentally, then I am ready to prepare physically.” - Anthony Garone
-“There is no benefit to playing hard.” - Anthony Garone
-“Picking and fretting with a light touch is essential.” - Anthony Garone
-“It's fun to gamify the practice process in such ways.” - Anthony Garone
-“Every permutation provides a new perspective and new ways of proving the hands.” - Anthony Garone
-“I may not have conquered the piece at that time, but I conquered something inside of myself.” - Anthony Garone
-“No criticism could hold me back.” - Anthony Garone
-“No mistakes could conquer me.” - Anthony Garone
-“There are no secrets to unlock.” - Anthony Garone
-“This is slow and steady work.” - Anthony Garone
-“You're running a marathon, not a 100-meter race.” - Anthony Garone
-“Our feeling nature moves in a different direction from our thinking nature.” - J. G. Bennett
-“The only part of us that is able to explore other dimensions is our feeling nature.” - J. G. Bennett
-“The essential thing here is that we are speaking of stillness.” - J. G. Bennett
-“A positive emotion is a state of deep but very intense stillness.” - J. G. Bennett
-“Wish is just a force.” - J. G. Bennett
-“This is the primary urge that comes from the depths of our nature: the wish to be.” - J. G. Bennett
-“Hope comes from within.” - J. G. Bennett
-“We become aware that we are not alone.” - J. G. Bennett
-“Sometimes one is overwhelmed by gratitude that we are not deserted.” - J. G. Bennett
-“There is a higher power that cares for you and for me.” - J. G. Bennett
-“The confidence grows in us that our eternal welfare is assured.” - J. G. Bennett
-“What is required from me, in front of this?” - J. G. Bennett
-“There comes an enormous relief when one sees that it is possible to accept the law of our own nature.” - J. G. Bennett
-“It is possible to accept our own destiny.” - J. G. Bennett
-“In all the sacred impulses, the Dharma is universal, everywhere.” - J. G. Bennett
-“There is this positive feeling of acceptance.” - J. G. Bennett
-“Love is universal, pervasive, in everything.” - J. G. Bennett
-“This is what makes the impossible union of the many.” - J. G. Bennett
-“It is the accepting of all that is.” - J. G. Bennett
-“You have to be very quiet and remain quiet and very sensitive for a long time before something begins to stir.” - J. G. Bennett
 “One red leaf in the ocean, two red lips without motion.” - SB | YouTube
 “Hallelujah, glad I knew you; never know, dear, what went through you.” - SB | YouTube
 “A ring in the rocket, a lock on the locket.” - SB | YouTube
@@ -8655,99 +7982,6 @@ calRender();
 “Feisty fuel for formidable future flatulence.” - SB
 “Yikes, this group is getting scary-good.” - SB
 “The good news: it sounds faster and harder than it is.” - SB
-“An accident is perhaps the only thing that really inspires us.” - Igor Stravinsky
-“A composer improvises aimlessly the way an animal grubs about.” - Igor Stravinsky
-“He is in quest of his pleasure.” - Igor Stravinsky
-“Once he has completed his work, the creator necessarily feels the need to share his joy.” - Igor Stravinsky
-“The listener reacts and becomes a partner in the game, initiated by the creator.” - Igor Stravinsky
-“In seed time learn, in harvest teach, in winter enjoy.” - William Blake
-“The road of excess leads to the palace of wisdom.” - William Blake
-“Drive your cart and your plow over the bones of the dead.” - William Blake
-“Prudence is a rich, ugly old maid, courted by incapacity.” - William Blake
-“He who desires, but acts not, breeds pestilence.” - William Blake
-“The cut worm forgives the plow.” - William Blake
-“Dip him in the river who loves water.” - William Blake
-“A fool sees not the same tree that the wise man sees.” - William Blake
-“He whose face gives no light shall never be a star.” - William Blake
-“Eternity is in love with the productions of time.” - William Blake
-“The busy bee has no time for sorrow.” - William Blake
-“The hours of folly are measured by the clock, but of wisdom no clock can measure.” - William Blake
-“What is now proved was once only imagined.” - William Blake
-“Truth can never be told so as to be understood, and not be believed.” - William Blake
-“You don't learn to play faster by playing faster.” - Bert Lams
-“Time opening up like a strange flower.” - Laurie Anderson
-“Quiet rearrangement of known rules.” - Laurie Anderson
-“Are you finding things strange, too?” - Laurie Anderson
-“You look up from the book you are reading. Then you see that so much work has been done.” - Laurie Anderson
-“You say, no one is calling me. Then you see, you calling no one either.” - Laurie Anderson
-“I am aware of the blessing of you.” - Laurie Anderson
-“Listening is more essential than playing.” - Nik Bärtsch
-“Music is like the deep sea or the rain forest.” - Nik Bärtsch
-“I need the body as well as the mind.” - Nik Bärtsch
-“Surprise is a big challenge.” - Nik Bärtsch
-“You cannot force that.” - Nik Bärtsch
-“It just needs time.” - Nik Bärtsch
-“A creative person has very often too many ideas.” - Nik Bärtsch
-“The band surprises itself.” - Nik Bärtsch
-“The groove always had a huge function.” - Nik Bärtsch
-“The piano cannot bend the note.” - Nik Bärtsch
-“Ronin treats the rhythm like the melody.” - Nik Bärtsch
-“We move in the triangle of interpretation, improvisation and composition.” - Nik Bärtsch
-“To let go and flow in the piece.” - Nik Bärtsch
-“It happens here.” - Nik Bärtsch
-“Ecstasy through asceticism.” - Nik Bärtsch
-“ECM respects people who are seriously interested in music.” - Nik Bärtsch
-“People need to feel respected.” - Nik Bärtsch
-“You have to learn also to make yourself disappear.” - Nik Bärtsch
-“Listen, only play the essentials and make the others sound good.” - Nik Bärtsch
-“Listen-breath-connect.” - Nik Bärtsch
-“Music is an art of motion.” - Nik Bärtsch
-“They can form combinations that take our senses by surprise.” - Nik Bärtsch
-“We work with the weight and the center, not with force.” - Nik Bärtsch
-“The music happens between us.” - Nik Bärtsch
-“Our music is somewhere between jazz and modern composition, progressive pop, ritual and groove music.” - Nik Bärtsch
-“Music is the best.” - Frank Zappa
-“We make a special art in an environment hostile to dreamers.” - Frank Zappa
-“Really creative people don't work good as employees.” - Frank Zappa
-“The music is an extension of me.” - Frank Zappa
-“The audience employs me to entertain them.” - Frank Zappa
-“I hum the news.” - Frank Zappa
-“A movie for your ears.” - Frank Zappa
-“Music means the organization of any data.” - Frank Zappa
-“Be your own catalyst.” - Frank Zappa
-“The Emperor's not wearing any clothes, never has, never will.” - Frank Zappa
-“Common sense is the way to go.” - Frank Zappa
-“If it entertains you, then great.” - Frank Zappa
-“If it's useful to you, then great.” - Frank Zappa
-“I just did my own stuff.” - Frank Zappa
-“There are certain things I'm not fond of, but hate takes a lot of energy.” - Frank Zappa
-“Does humor belong in music?” - Frank Zappa
-“Jazz isn't dead, it just smells funny.” - Frank Zappa
-“A composer's job involves the decoration of fragments of time.” - Frank Zappa
-“Without music to decorate it, time is just a bunch of boring production deadlines.” - Frank Zappa
-“As soon as it's done.” - Frank Zappa
-“Anybody who has got an imagination has to watch out for both sides.” - Frank Zappa
-“You should be free to do what your abilities will allow you to do.” - Frank Zappa
-“One of my specialties is taking existing off-the-shelf stuff and twisting it.” - Frank Zappa
-“Look at my head! The top of my head is gone!” - Frank Zappa
-“I'll play it and tell you what it is later.” - Miles Davis
-“For me, music and life are all about style.” - Miles Davis
-“I always thought that music had no boundaries.” - Miles Davis
-“No limits to where it could grow and go.” - Miles Davis
-“No restrictions on creativity.” - Miles Davis
-“I have to change. It's a curse.” - Miles Davis
-“I've changed music five or six times.” - Miles Davis
-“Don't play what's there; play what's not there.” - Miles Davis
-“Do not fear mistakes. There are none.” - Miles Davis
-“When you hit a wrong note, it's the next note that makes it good or bad.” - Miles Davis
-“If you're not making a mistake, it's a mistake.” - Miles Davis
-“You should never be comfortable, man.” - Miles Davis
-“You have to know what you want to play.” - Miles Davis
-“The only thing that matters is the music.” - Miles Davis
-“A legend is an old man with a cane known for what he used to do.” - Miles Davis
-“Anybody can play. The note is only twenty percent.” - Miles Davis
-“The attitude of the motherfucker who plays it is eighty percent.” - Miles Davis
-“Man, sometimes it takes you a long time to sound like yourself.” - Miles Davis
 “A better mistake is to play the wrong note with enthusiasm than the right note with temerity and fear.” - GC Aphorism
 “A burning question comes from need.” - GC Aphorism
 “A comfortable life and a creative life are mutually exclusive.” - GC Aphorism
@@ -9224,6 +8458,7 @@ calRender();
      stays deliberately unlinked. Names must match the attribution exactly.
      ========================================================================== -->
 <script type="text/plain" id="tomQuoteLinks">
+Steve Ball | https://steveball.com/
 RF | https://robertfripp.substack.com/
 Adrian Belew | https://www.adrianbelew.net/
 Allan Holdsworth | https://www.allanholdsworth.com/
