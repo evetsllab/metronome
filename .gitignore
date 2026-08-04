@@ -1,0 +1,22 @@
+# ── OS / editor cruft ────────────────────────────────────────────────
+Thumbs.db
+.DS_Store
+*~
+
+# ── Local backups & old versions (kept on the PC, not needed in the app repo) ──
+Archive/
+_pgbackup/
+
+# ── Node / Capacitor build artifacts (added when the iOS project is scaffolded) ──
+node_modules/
+dist/
+.env
+.env.*
+
+# ── iOS / Xcode build output (the ios/ project is committed, but not its build junk) ──
+ios/App/Pods/
+ios/App/build/
+ios/App/App/public/
+DerivedData/
+*.xcuserstate
+xcuserdata/

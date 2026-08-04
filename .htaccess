@@ -1,0 +1,7 @@
+DirectoryIndex index.html
+
+<IfModule mod_headers.c>
+<FilesMatch "\.(html|js)$">
+Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+</FilesMatch>
+</IfModule>
