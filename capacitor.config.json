@@ -1,0 +1,11 @@
+{
+  "appId": "com.steveball.metronome",
+  "appName": "Accelerating Metronome",
+  "webDir": "www",
+  "server": {
+    "iosScheme": "capacitor"
+  },
+  "ios": {
+    "backgroundColor": "#000000"
+  }
+}
