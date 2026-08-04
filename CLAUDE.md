@@ -5,6 +5,24 @@
 > build continues on his **Mac**. If you are the Claude session on the Mac,
 > read this top-to-bottom — it saves you re-analyzing the 9,300-line app.
 
+## STATUS (updated)
+Steps 1–7 are **built and verified on Windows** and committed:
+1. ✅ Capacitor 6 iOS project (appId com.steveball.metronome, name "Accelerating Metronome").
+2. ✅ Web app embedded in `www/`; self-contained, loads offline.
+3. ✅ Native AVAudioSession (.playback) in AppDelegate; MediaStreamDestination
+   bypassed natively, kept for web; background-audio mode + portrait-only in Info.plist.
+4. ✅ Look-ahead scheduler verified running clean (browser test, no errors).
+5. ✅ Quotes stripped to 1,163 (Steve Ball 667 + Guitar Craft 466 + Steve Turnidge 30);
+   "SB" renders as "Steve Ball" linked to steveball.com. Gist sync UI + network paths removed.
+6. ✅ Haptic-on-beat toggle (Taptic Engine, native-only, default off).
+7. ✅ App icon + launch screen = exact reproduction of the real dial (bezel, 120-at-top,
+   red pointer, Guitar Craft knot). Sources in `assets/` (icon.png, dial.svg, knot.png).
+
+**Remaining (Mac only — see `MAC-BUILD.md`):** step 8 App Store screenshots via the
+iOS Simulator (⌘S at 6.9"/6.5"), and step 9 signing + archive + upload in Xcode.
+Screenshots need the Simulator because Windows can't produce exact-device-resolution
+captures — MAC-BUILD.md step 4 makes it a 2-minute job.
+
 ## Who / what
 - **Owner:** Steve Ball (steveball@steveball.com), Ballistic Music, Seattle.
   He owns this app outright (design, code, sounds, artwork) — repackaging it is
