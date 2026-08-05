@@ -64,7 +64,7 @@
                 <p>The short version: this is a metronome that invites the universe to set your beginning tempo, accelerates upward over a fixed number of minutes, and keeps a record of every minute you practice, including what you practiced. It runs in a web browser on any device you own, and your practice history follows you between devices if you log in with a free Github account.</p>
             </div>
             <nav class="toc">
-                <div class="toc-label">On this page</div><a href="#history">1 &nbsp;History</a><a href="#basics">2 &nbsp;The metronome overview</a><a href="#spin">3 &nbsp;Spin the Metronome</a><a href="#accel">4 &nbsp;The Accelerator</a><a href="#play">5 &nbsp;Play Time</a><a href="#cats">6 &nbsp;Practice Categories</a><a href="#log">7 &nbsp;The Practice Log</a><a href="#history-cal">8 &nbsp;Practice History and streaks</a><a href="#sync">9 &nbsp;Sync across devices</a><a href="#audio">10 &nbsp;Solo and Mix</a><a href="#platform">11 &nbsp;Devices, offline, privacy</a><a href="#app">12 &nbsp;The iOS app</a><a href="#credits">13 &nbsp;Credits</a>
+                <div class="toc-label">On this page</div><a href="#history">1 &nbsp;History</a><a href="#basics">2 &nbsp;The metronome overview</a><a href="#spin">3 &nbsp;Spin the Metronome</a><a href="#accel">4 &nbsp;The Accelerator</a><a href="#play">5 &nbsp;Play Time</a><a href="#cats">6 &nbsp;Practice Categories</a><a href="#log">7 &nbsp;The Practice Log</a><a href="#history-cal">8 &nbsp;Practice History and streaks</a><a href="#sync">9 &nbsp;Sync across devices</a><a href="#audio">10 &nbsp;Solo and Mix</a><a href="#platform">11 &nbsp;Devices, offline, privacy</a><a href="#app">12 &nbsp;The iOS app</a><a href="#privacy">13 &nbsp;Privacy &amp; data</a><a href="#credits">14 &nbsp;Credits</a>
             </nav>
             <!-- 1 HISTORY -->
             <section id="history">
@@ -493,7 +493,7 @@
                 <h2>The iOS app</h2>
                 <div class="qa">
                     <h3>Is there going to be a real app?</h3>
-                    <p><strong>Yes. An iOS version is targeted for mid-August 2026.</strong> The web version continues exactly as it is, free, and it remains the version I developed first.</p>
+                    <p><strong>Yes &mdash; it is here.</strong> The native iOS app, <strong>Accelerating Metronome</strong>, is finished and in TestFlight beta now, with its official App Store release on <strong>Friday, 7 August 2026</strong>. The web version continues exactly as it is, free, and it remains the version I developed first.</p>
                 </div>
                 <div class="qa">
                     <h3>What does a native app get me that the browser cannot?</h3>
@@ -505,12 +505,52 @@
                 </div>
                 <div class="qa">
                     <h3>Will my practice history come with me?</h3>
-                    <p><strong>That is the intention, through the same export and sync you have now.</strong> The JSON export exists partly for this reason. Keep a copy.</p>
+                    <p><strong>Your history lives on your device.</strong> The iOS app keeps your practice log, categories, and settings in its own on-device storage, and you can export the whole log as JSON at any time to move it or keep a backup. Keep a copy.</p>
+                </div>
+                <div class="qa">
+                    <h3>Is my data private? What does the iOS app collect?</h3>
+                    <p><strong>It collects nothing, and it keeps your data on your iPhone.</strong> Unlike the web version, the iOS app does <strong>not</strong> use GitHub or any cloud service, and it has no server, no account, and no sign-in &mdash; nothing you enter is sent anywhere by the app. There is no analytics, advertising, or tracking. The only copy that ever leaves the phone is the one iOS folds into your standard, end-to-end encrypted iCloud backup under your Apple ID, exactly as it does for every app; that backup is Apple&apos;s and I have no access to it. Full details are in <a href="#privacy">Privacy &amp; data</a>.</p>
                 </div>
             </section>
-            <!-- 13 CREDITS -->
-            <section id="credits">
+            <!-- 13 PRIVACY -->
+            <section id="privacy">
                 <div class="sec-num">13</div>
+                <h2>Privacy &amp; data</h2>
+                <div class="qa">
+                    <p><strong>This is the privacy policy for the Accelerating Metronome iOS app and the Tiny Orchestral Metronome web app.</strong> Last updated 4 August 2026. In one line: the app collects nothing about you and keeps your practice data on your own device.</p>
+                </div>
+                <div class="qa">
+                    <h3>What data does the app collect?</h3>
+                    <p><strong>None.</strong> The Accelerating Metronome iOS app collects no personal data whatsoever. There is no account, no sign-in, no analytics, no advertising, no tracking, no third-party SDKs, and nothing is sold or shared. This matches Apple&apos;s &quot;Data Not Collected&quot; disclosure shown on the App Store product page.</p>
+                </div>
+                <div class="qa">
+                    <h3>Where is my practice data stored?</h3>
+                    <p><strong>On your device, and nowhere else by the app.</strong> Your practice history, categories, session names, and settings are saved in the app&apos;s private on-device storage. The iOS app does <strong>not</strong> use GitHub or any other cloud service, and it has no server of its own; nothing you enter is transmitted off the device by the app.</p>
+                </div>
+                <div class="qa">
+                    <h3>What about iCloud and my Apple ID?</h3>
+                    <p><strong>The app never reads or writes your Apple ID.</strong> Because your data lives in the app&apos;s on-device storage, iOS may include it in your standard, end-to-end encrypted iCloud device backup, exactly as it does for every app you install. That backup is operated by Apple under your Apple ID and Apple&apos;s privacy terms; the developer has no access to it and receives none of that data.</p>
+                </div>
+                <div class="qa">
+                    <h3>Does the app use my microphone, location, contacts, or other sensors?</h3>
+                    <p><strong>No.</strong> The app plays audio and, optionally, uses the Taptic Engine for haptic feedback on the beat. It does not request or access the microphone, camera, location, contacts, photos, health data, or any other personal information.</p>
+                </div>
+                <div class="qa">
+                    <h3>Children&apos;s privacy</h3>
+                    <p>Because the app collects no personal information from anyone, it collects none from children, and it does not knowingly gather data from users under 13. It is safe for use by all ages.</p>
+                </div>
+                <div class="qa">
+                    <h3>Can I delete my data?</h3>
+                    <p><strong>Entirely, and it is under your control.</strong> Your data is on your device, so deleting the app removes it. You can also export your practice log as JSON at any time to keep your own copy first.</p>
+                </div>
+                <div class="qa">
+                    <h3>Changes and contact</h3>
+                    <p>If this policy changes, the updated version is posted here with a new date. Questions about privacy can be sent through <a href="https://steveball.com" target="_blank" rel="noopener noreferrer">steveball.com</a>. Publisher: Steve Ball, Ballistic Music, Seattle, Washington.</p>
+                </div>
+            </section>
+            <!-- 14 CREDITS -->
+            <section id="credits">
+                <div class="sec-num">14</div>
                 <h2>Credits</h2>
                 <div class="qa">
                     <h3>Who made this?</h3>
